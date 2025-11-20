@@ -1,54 +1,99 @@
-# Using Unsupervised Methods to Classify X-ray Fluorescence Data
+# Using Unsupervised Methods to Classify X-ray Fluorescence Data  
+**By Larry Griffith, Matthew Hashim, Jared Kagie**
 
-## By Larry Griffith, Matthew Hashim, Jared Kagie
+---
 
-# To Run The Code
+## How to Run the Code
 
-First, create a virtual envornment, so there's no conflicts with python package versions
+### 1. Create a Virtual Environment  
+Use a virtual environment to avoid package conflicts:
 
-In a directory of your choosing, run: python -m venv <virtual enviornment name>
+```
+python -m venv <venv_name>
+```
 
-Then activate the venv by running <virtual enviornment name>\Scripts\activate, this will create a virtual envornment for your python code, making sure no conflicts occur
+### 2. Activate the Environment  
+On Windows:
 
-Then run pip install -r requirements.txt, this will install the packages, only within the enviornment, so you can't run this code while the enviornment is deactivated (type deactivate in the terminal to turn off the virtual envornment)
+```
+<venv_name>\Scripts\activate
+```
 
-To run the code once the virtual enviornment is set up, run one of the two commands:  
-python "Autoencoder HDBscan Labeled.py" --csv=path\to\AllPXRF_FINAL_14Oct.csv --out=whatever\output\dir  
-or  
-python "Autoencoder HDBscan Unlabeled.py" --csv=path\to\MV0811-14JC_merged_sec1-4.csv (or path\to\data\MV0811-14JC_merged_sec5-8.csv, depending on what file you want to test) --out=whatever\output\dir
+### 3. Install Required Packages
 
-You can also add some additional flags:
+```
+pip install -r requirements.txt
+```
 
-**Common Flags (Both Versions)**  
---csv - Path to input CSV file (required)  
---out - Output directory for results  
---latent - Dimensionality of latent space (compression level)  
---epochs - Number of training iterations for autoencoder  
---batch - Number of samples processed per training batch  
---test-size - Fraction of data reserved for testing (0.0-1.0)  
---no-baselines - Skip baseline method comparisons  
+Deactivate anytime with:
 
-**Unlabeled Version Only**  
---features - Comma-separated list of element columns to use  
---target - Optional target column name for evaluation  
+```
+deactivate
+```
 
-The output for the labeled version will look like this:
+---
 
+## Running the Pipeline
+
+Once your environment is ready, run **one** of the following:
+
+### **Labeled Version**
+```
+python "Autoencoder HDBscan Labeled.py" --csv=path\to\AllPXRF_FINAL_14Oct.csv --out=path\to\output
+```
+
+### **Unlabeled Version**
+```
+python "Autoencoder HDBscan Unlabeled.py" --csv=path\to\MV0811-14JC_merged_sec1-4.csv --out=path\to\output
+```
+
+(Or use `MV0811-14JC_merged_sec5-8.csv` depending on which file you want to test.)
+
+---
+
+## Optional Flags
+
+### **Common Flags (Both Versions)**  
+| Flag | Description |
+|------|-------------|
+| `--csv` | Path to input CSV file (**required**) |
+| `--out` | Output directory |
+| `--latent` | Size of latent representation |
+| `--epochs` | Autoencoder training iterations |
+| `--batch` | Training batch size |
+| `--test-size` | Fraction of data for testing (0.0–1.0) |
+| `--no-baselines` | Disable baseline comparisons |
+
+### **Unlabeled Version Only**
+| Flag | Description |
+|------|-------------|
+| `--features` | Comma-separated list of element columns |
+| `--target` | Optional column for evaluation |
+
+---
+
+## Expected Output Structure (Labeled Version)
+
+```
 Results/
 ├── Models/
 │   ├── autoencoder.keras          # Trained autoencoder
-│   ├── encoder.keras              # Encoder for feature extraction
-│   ├── hdbscan_model.pkl          # Fitted clusterer
+│   ├── encoder.keras              # Encoder (feature extractor)
+│   ├── hdbscan_model.pkl          # Cluster model
 │   ├── binary_classifier.pkl      # Soil vs non-soil classifier
-│   └── multiclass_classifier.pkl  # Material type classifier
+│   └── multiclass_classifier.pkl  # Material classifier
+│
 ├── Data/
-│   ├── latent_train.npy           # Latent representations
-│   ├── cluster_assignments.csv    # Final cluster labels
-│   └── cluster_to_material.json   # Cluster mapping (labeled)
+│   ├── latent_train.npy           # Latent features
+│   ├── cluster_assignments.csv    # Cluster IDs
+│   └── cluster_to_material.json   # Cluster → label mapping
+│
 ├── Visualizations/
-│   ├── training_loss.png          # Autoencoder training curve
-│   ├── latent_pca_hdbscan.png     # 2D cluster visualization
-│   └── confusion_matrix.png       # Classification performance
+│   ├── training_loss.png          # Autoencoder loss curve
+│   ├── latent_pca_hdbscan.png     # Cluster visualization
+│   └── confusion_matrix.png       # Classification results
+│
 └── Metrics/
-    ├── hdbscan_results.json       # Comprehensive evaluation
-    └── baselines.json             # Method comparisons
+    ├── hdbscan_results.json       # Cluster evaluation
+    └── baselines.json             # Baseline comparisons
+```
