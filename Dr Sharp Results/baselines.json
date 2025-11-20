@@ -1,0 +1,10 @@
+{
+  "pca_hdbscan_ARI_train": 0.06548743648044046,
+  "pca_hdbscan_NMI_train": 0.2555193422060883,
+  "pca_hdbscan_ARI_test": 0.07166272318657872,
+  "pca_hdbscan_NMI_test": 0.2632369573802406,
+  "kmeans_latent_ARI_train": 0.06518151088241336,
+  "kmeans_latent_NMI_train": 0.11923281597035212,
+  "kmeans_latent_ARI_test": 0.04985668950284632,
+  "kmeans_latent_NMI_test": 0.10787658312431554
+}

@@ -1,0 +1,108 @@
+{
+  "silhouette_latent_train": 0.6954659223556519,
+  "silhouette_latent_test": 0.6873016357421875,
+  "ARI_train": 0.10708432585394644,
+  "NMI_train": 0.30012294753148666,
+  "ARI_test": 0.11067216920584148,
+  "NMI_test": 0.30962472119192286,
+  "cluster_counts_train": {
+    "-1": 550,
+    "0": 75,
+    "1": 75,
+    "2": 59,
+    "3": 585,
+    "4": 528,
+    "5": 773,
+    "6": 795,
+    "7": 184
+  },
+  "cluster_counts_test": {
+    "-1": 122,
+    "0": 23,
+    "1": 20,
+    "2": 20,
+    "3": 173,
+    "4": 126,
+    "5": 179,
+    "6": 191,
+    "7": 52
+  },
+  "noisy_fraction_train": 0.15176600441501104,
+  "noisy_fraction_test": 0.1346578366445916,
+  "majority_vote_accuracy_train": 0.9752765126870527,
+  "majority_vote_accuracy_test": 0.9706632653061225,
+  "binary_classification": {
+    "accuracy": 0.9790286975717439,
+    "f1_score": 0.9886431560071728,
+    "classification_report": {
+      "non-soil": {
+        "precision": 0.9798578199052133,
+        "recall": 0.9975874547647768,
+        "f1-score": 0.9886431560071728,
+        "support": 829.0
+      },
+      "soil": {
+        "precision": 0.967741935483871,
+        "recall": 0.7792207792207793,
+        "f1-score": 0.8633093525179856,
+        "support": 77.0
+      },
+      "accuracy": 0.9790286975717439,
+      "macro avg": {
+        "precision": 0.9737998776945421,
+        "recall": 0.8884041169927781,
+        "f1-score": 0.9259762542625791,
+        "support": 906.0
+      },
+      "weighted avg": {
+        "precision": 0.9788281034588078,
+        "recall": 0.9790286975717439,
+        "f1-score": 0.9779911660859063,
+        "support": 906.0
+      }
+    }
+  },
+  "multiclass_classification": {
+    "accuracy": 0.9768211920529801,
+    "f1_score_weighted": 0.9753694670201916,
+    "classification_report": {
+      "metal": {
+        "precision": 0.8571428571428571,
+        "recall": 0.5454545454545454,
+        "f1-score": 0.6666666666666666,
+        "support": 11.0
+      },
+      "pottery": {
+        "precision": 0.9829172141918529,
+        "recall": 0.9986648865153538,
+        "f1-score": 0.990728476821192,
+        "support": 749.0
+      },
+      "slag": {
+        "precision": 0.9452054794520548,
+        "recall": 1.0,
+        "f1-score": 0.971830985915493,
+        "support": 69.0
+      },
+      "soil": {
+        "precision": 0.9538461538461539,
+        "recall": 0.8051948051948052,
+        "f1-score": 0.8732394366197183,
+        "support": 77.0
+      },
+      "accuracy": 0.9768211920529801,
+      "macro avg": {
+        "precision": 0.9347779261582296,
+        "recall": 0.8373285592911761,
+        "f1-score": 0.8756163915057675,
+        "support": 906.0
+      },
+      "weighted avg": {
+        "precision": 0.9760473474465947,
+        "recall": 0.9768211920529801,
+        "f1-score": 0.9753694670201916,
+        "support": 906.0
+      }
+    }
+  }
+}

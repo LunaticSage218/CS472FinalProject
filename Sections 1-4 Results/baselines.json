@@ -1,6 +1,6 @@
 {
   "baseline_cluster_counts": {
-    "hdbscan_clusters": 2,
+    "hdbscan_clusters": 3,
     "kmeans_clusters": 5
   }
 }

@@ -1,4 +1,41 @@
-# pxrf unsupervised pipeline: autoencoder + hdbscan + optional classification
+"""pXRF Unsupervised Machine Learning Pipeline for Unlabeled Data
+
+This module implements an unsupervised machine learning pipeline for analyzing
+portable X-Ray Fluorescence (pXRF) geochemical data WITHOUT requiring labels.
+The pipeline combines:
+  1. Deep learning autoencoder for dimensionality reduction
+  2. PCA on latent space for noise reduction
+  3. HDBSCAN clustering for pattern discovery
+  4. Optional supervised classification if labels are available
+
+This version is optimized for unlabeled or partially labeled datasets,
+making it ideal for exploratory analysis and new data discovery.
+
+Key Differences from Labeled Version:
+    - Does not require material type labels in input data
+    - Applies PCA to latent representations before clustering
+    - Uses fixed HDBSCAN parameters optimized for unlabeled data
+    - More robust to missing or partial labels
+    - Flexible feature column specification
+
+Typical Workflow:
+    1. Load pXRF data from CSV (labels optional)
+    2. Standardize features (train/test split if labels exist)
+    3. Train autoencoder to learn compact latent representations
+    4. Apply PCA to latent space to reduce noise (5D)
+    5. Run HDBSCAN clustering on PCA-reduced latent space
+    6. Optionally train classifiers if labels are present
+    7. Generate visualizations and export cluster assignments
+
+Example:
+    $ python "Autoencoder HDBscan Unlabeled.py" --csv data/MV0811-14JC_merged_sec1-4.csv \
+        --out "Sections 1-4 Results" --latent 8 --epochs 100 \
+        --features "Al,Si,P,S,Cl,K,Ca,Ti,Fe,Zn"
+
+Author: CS472 Final Project
+Date: November 2025
+"""
+
 import argparse
 import json
 import numpy as np
@@ -26,11 +63,67 @@ default_elements = [
 ]
 seed = 42
 
-# helper functions
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
 def ensure_dir(p):
+    """Create a directory if it doesn't exist.
+    
+    Args:
+        p (str or Path): Path to the directory to create.
+        
+    Returns:
+        None
+        
+    Example:
+        >>> ensure_dir('results/experiment1')
+        # Creates results/experiment1/ directory if it doesn't exist
+    """
     Path(p).mkdir(parents=True, exist_ok=True)
 
 def load_and_prepare(csv_path, feature_cols=None, target_col=None, fillna_zero=True):
+    """Load and preprocess pXRF data from CSV file (flexible for unlabeled data).
+    
+    This function loads geochemical element concentration data with enhanced
+    error handling for malformed files and flexible feature selection.
+    Labels are optional for this version.
+    
+    Args:
+        csv_path (str): Path to input CSV file containing pXRF measurements.
+        feature_cols (list, optional): List of element column names to use as features.
+            If None, uses default_elements list. Defaults to None.
+        target_col (str, optional): Name of column containing material labels.
+            If None or column doesn't exist, all samples labeled as 'unknown'. Defaults to None.
+        fillna_zero (bool, optional): Whether to fill missing values with 0. Defaults to True.
+        
+    Returns:
+        tuple: A tuple containing:
+            - X (np.ndarray): Feature matrix of shape (n_samples, n_features)
+            - y (np.ndarray): Material type labels or 'unknown' if not available
+            - y_binary (np.ndarray): Binary labels ('soil' vs 'non-soil')
+            - used_feature_cols (list): List of element column names actually used
+            - coords (pd.DataFrame or None): X_Coord and Y_Coord if available
+            
+    Data Cleaning:
+        - Handles malformed CSV lines by skipping them
+        - Only uses columns that exist in the CSV
+        - Converts non-numeric values to NaN
+        - Missing values filled with 0 (if fillna_zero=True)
+        - Clips negative values to 0
+        - Creates binary labels even without true labels
+        
+    Example:
+        >>> # With specific features and no labels
+        >>> features = ['Al', 'Si', 'Fe', 'Ca', 'K']
+        >>> X, y, y_bin, cols, coords = load_and_prepare(
+        ...     'unlabeled_data.csv',
+        ...     feature_cols=features,
+        ...     target_col=None
+        ... )
+        >>> print(X.shape)  # (5000, 5)
+        >>> print(y[0])     # 'unknown'
+    """
     print('step 1: load csv')
     try:
         df = pd.read_csv(csv_path)
@@ -69,6 +162,33 @@ def load_and_prepare(csv_path, feature_cols=None, target_col=None, fillna_zero=T
     return X.values.astype(float), y.values, y_binary.values, used_feature_cols, coords
 
 def build_autoencoder(input_dim, latent_dim, hidden_dims=(64,32), lr=1e-3):
+    """Build a deep autoencoder neural network for dimensionality reduction.
+    
+    Creates a symmetric encoder-decoder architecture that learns to compress
+    high-dimensional geochemical data into a lower-dimensional latent space
+    while preserving important patterns.
+    
+    Architecture:
+        Encoder: input -> hidden_dims[0] -> hidden_dims[1] -> latent_dim
+        Decoder: latent_dim -> hidden_dims[1] -> hidden_dims[0] -> input_dim
+        
+    Args:
+        input_dim (int): Number of input features (varies by element selection).
+        latent_dim (int): Dimensionality of latent space (compressed representation).
+        hidden_dims (tuple, optional): Sizes of hidden layers. Defaults to (64, 32).
+        lr (float, optional): Learning rate for Adam optimizer. Defaults to 1e-3.
+        
+    Returns:
+        tuple: A tuple containing:
+            - ae (keras.Model): Complete autoencoder model for training
+            - encoder (keras.Model): Encoder portion for generating latent representations
+            
+    Example:
+        >>> ae, encoder = build_autoencoder(input_dim=34, latent_dim=8)
+        >>> ae.summary()  # Shows architecture
+        >>> # Train: ae.fit(X_train, X_train, epochs=100)
+        >>> # Encode: Z = encoder.predict(X_test)
+    """
     inp = layers.Input(shape=(input_dim,))
     x = inp
     for h in hidden_dims:
@@ -83,10 +203,103 @@ def build_autoencoder(input_dim, latent_dim, hidden_dims=(64,32), lr=1e-3):
     ae.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=lr), loss='mse')
     return ae, encoder
 
-# training + clustering pipeline
-def run_pipeline(csv_path, out_dir='results', latent_dim=8, epochs=100, batch_size=32,
+# ============================================================================
+# Main Pipeline
+# ============================================================================
+
+def run_pipeline(csv_path, out_dir='Sections 1-4 Results', latent_dim=8, epochs=100, batch_size=32,
                  run_baselines=True, use_pca_for_viz=True, test_size=0.2,
                  feature_cols=None, target_col=None):
+    """Execute the complete unsupervised learning pipeline for unlabeled pXRF data.
+    
+    This is the main function that orchestrates the entire workflow for
+    unlabeled or partially labeled datasets:
+      1. Data loading and preprocessing (labels optional)
+      2. Train/test split (if labels available) or use full dataset
+      3. Feature standardization
+      4. Autoencoder training for dimensionality reduction
+      5. PCA on latent space (Path 1: reduces to 5D for better clustering)
+      6. HDBSCAN clustering on PCA(latent) with fixed parameters
+      7. Optional cluster evaluation if labels exist
+      8. Optional classification training if labels exist
+      9. Baseline comparisons (PCA+HDBSCAN on raw features, KMeans)
+      10. Visualization generation
+      11. Results export
+      
+    Key Features for Unlabeled Data:
+        - No labels required (uses 'unknown' placeholder)
+        - PCA preprocessing of latent space before clustering
+        - Fixed HDBSCAN parameters (min_cluster_size=20, min_samples=10)
+        - Robust error handling for malformed data
+        - Flexible feature column specification
+        
+    Args:
+        csv_path (str): Path to input CSV file with pXRF element data.
+        out_dir (str, optional): Output directory for results. Defaults to 'Sections 1-4 Results'.
+        latent_dim (int, optional): Dimensionality of latent space. Defaults to 8.
+        epochs (int, optional): Number of training epochs for autoencoder. Defaults to 100.
+        batch_size (int, optional): Batch size for autoencoder training. Defaults to 32.
+        run_baselines (bool, optional): Whether to run baseline methods. Defaults to True.
+        use_pca_for_viz (bool, optional): Use PCA for 2D visualization. Defaults to True.
+        test_size (float, optional): Fraction of data for testing (0.0-1.0). Defaults to 0.2.
+        feature_cols (list, optional): List of feature column names. If None, uses default_elements.
+        target_col (str, optional): Name of label column. If None, no labels used.
+        
+    Returns:
+        dict: Dictionary containing evaluation metrics (if labels available):
+            - silhouette_latent_train/test: Silhouette scores
+            - majority_vote_accuracy_train/test: Cluster-to-material mapping accuracy
+            - binary_classification: Binary classifier metrics (if labels exist)
+            - multiclass_classification: Multiclass classifier metrics (if labels exist)
+            
+    Output Files Created:
+        Models:
+            - autoencoder.keras: Trained autoencoder model
+            - encoder.keras: Encoder portion only
+            - scaler.pkl: StandardScaler for feature normalization
+            - latent_pca_model.pkl: PCA model fitted to latent space
+            - hdbscan_model.pkl: Fitted HDBSCAN clusterer
+            - binary_classifier.pkl: Binary classifier (if labels available)
+            - multiclass_classifier.pkl: Multiclass classifier (if labels available)
+            
+        Data:
+            - latent_train.npy, latent_test.npy: Latent representations (8D)
+            - hdbscan_labels_train.csv, hdbscan_labels_test.csv: Cluster assignments
+            - cluster_assignments_train.csv, cluster_assignments_test.csv: Full results
+            - cluster_to_material.json: Cluster mapping (if labels available)
+            
+        Visualizations:
+            - training_loss.png: Autoencoder training curves
+            - latent_pca_hdbscan_train.png: 2D PCA visualization of clusters
+            
+        Metrics:
+            - baselines.json: Baseline method comparison results
+            
+    Example:
+        >>> # Unlabeled data with custom features
+        >>> results = run_pipeline(
+        ...     csv_path='data/sediment_cores.csv',
+        ...     out_dir='core_analysis',
+        ...     latent_dim=8,
+        ...     epochs=100,
+        ...     feature_cols=['Al','Si','Fe','Ca','K'],
+        ...     target_col=None  # No labels
+        ... )
+        >>> # Check clustering output
+        >>> clusters = pd.read_csv('core_analysis/cluster_assignments_train.csv')
+        >>> print(clusters['cluster'].value_counts())
+        
+    Pipeline Decisions:
+        - If no labels detected: Skips evaluation and classification steps
+        - If HDBSCAN finds no clusters: Marks all points as noise (-1)
+        - Uses smaller min_cluster_size (20) for finer-grained clustering
+        - Applies 5D PCA to latent space before clustering (reduces noise)
+        - Baseline uses 6D PCA on raw features for fair comparison
+        
+    Raises:
+        FileNotFoundError: If csv_path does not exist.
+        pd.errors.ParserError: If CSV is severely malformed (caught internally).
+    """
 
     ensure_dir(out_dir)
 
@@ -390,7 +603,7 @@ def run_pipeline(csv_path, out_dir='results', latent_dim=8, epochs=100, batch_si
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='pxrf unsupervised pipeline: autoencoder + hdbscan + optional classification')
     parser.add_argument('--csv', type=str, required=True, help='path to input csv file')
-    parser.add_argument('--out', type=str, default='results', help='output directory')
+    parser.add_argument('--out', type=str, default='Sections 1-4 Results', help='output directory')
     parser.add_argument('--latent', type=int, default=8, help='latent space dimensionality')
     parser.add_argument('--epochs', type=int, default=100, help='number of epochs for autoencoder')
     parser.add_argument('--batch', type=int, default=32, help='batch size')
